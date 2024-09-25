@@ -1,11 +1,11 @@
 import os
 
 import time
+import queue
 import pyaudio as pa
 import numpy as np
-from packages.sales_chatbot import SalesChatbot
-from packages.nemo_stt import StreamingTranscription  # Update the class name if different
-from packages.elevenlabs_tts import speak  # Update the class name if different
+from packages.nemo_stt import StreamingTranscription  # Update the class name if different # Update the class name if different
+from packages.workers import SpeakWorker, ChatbotWorker
 
 
 SAMPLE_RATE = 16000
@@ -13,7 +13,8 @@ CHUNK_SIZE = 160  # ms
 WAIT_TIME = 500  # ms
 
 transcriber = StreamingTranscription()
-chatbot = SalesChatbot()
+speak_worker = SpeakWorker(queue.Queue())
+chatbot_worker = ChatbotWorker(queue.Queue(), speak_worker)
 
 state = {
     "last_text": "",
@@ -22,23 +23,27 @@ state = {
 
 def callback(in_data, *_):
     signal = np.frombuffer(in_data, dtype=np.int16)
+
+    start_time = time.time()
     text = transcriber.transcribe_chunk(signal)
+    print(f"STT latency: {time.time() - start_time}s")
     
     if text != state["last_text"]:
         state["last_text"] = text
         state["silence_duration"] = 0
+
+        # If the user has been speaking, interrupt workers and clear their task queues
+        if speak_worker.is_speaking:
+            speak_worker.interupt()
+            chatbot_worker.interupt()
     else:
         state["silence_duration"] += CHUNK_SIZE / 2
         
         # Check if the user said anything and at least WAIT_TIME has since passed
         if state["silence_duration"] >= WAIT_TIME and len(state["last_text"]) > 0:
             print(f"USER: {state['last_text']}")      
-            # Generate response using the chatbot
-            ai_response = chatbot.generate_response(state["last_text"])
-            print(f"AI: {ai_response}")
-
-            # Speak the AI's response
-            speak(ai_response)
+            # Add the user's last text to the chatbot task queue
+            chatbot_worker.add_chatbot_task(state["last_text"])
             
             # Reset transcription cache and keep transcribing
             transcriber.reset_transcription_cache() 
@@ -70,6 +75,9 @@ if len(input_devices):
         stream_callback=callback,
         frames_per_buffer=int(SAMPLE_RATE * CHUNK_SIZE / 1000) - 1
     )
+
+    speak_worker.start()
+    chatbot_worker.start()
 
     print('Listening...')
 
