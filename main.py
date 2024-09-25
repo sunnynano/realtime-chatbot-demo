@@ -32,10 +32,8 @@ def callback(in_data, *_):
         state["last_text"] = text
         state["silence_duration"] = 0
 
-        # If the user has been speaking, interrupt workers and clear their task queues
-        if speak_worker.is_speaking:
-            speak_worker.interupt()
-            chatbot_worker.interupt()
+        speak_worker.interupt()
+        chatbot_worker.interupt()
     else:
         state["silence_duration"] += CHUNK_SIZE / 2
         

@@ -48,9 +48,8 @@ if text != state["last_text"]:
     {...}
 
     # If the user has started speaking, interrupt the workers and clear their task queues
-    if speak_worker.is_speaking:
-        speak_worker.interrupt()
-        chatbot_worker.interrupt()
+    speak_worker.interrupt()
+    chatbot_worker.interrupt()
 ```
 
 ## (Potentially) Improving STT Inference Speed with FP16
