@@ -21,6 +21,13 @@ state = {
     "silence_duration": 0,
 }
 
+def get_filter_response(text):
+    filter_responses = ["Ummm.", "OK.", "Thanks for the info.", "Got it.", "I see.", "Right."]
+
+    #in the future, the choice of filter responses can be based on the user's input. 
+    #This can be done by a small neural network running on the local machine.
+    return filter_responses[np.random.randint(0, len(filter_responses) - 1)]
+
 def callback(in_data, *_):
     signal = np.frombuffer(in_data, dtype=np.int16)
 
@@ -40,6 +47,9 @@ def callback(in_data, *_):
         # Check if the user said anything and at least WAIT_TIME has since passed
         if state["silence_duration"] >= WAIT_TIME and len(state["last_text"]) > 0:
             print(f"USER: {state['last_text']}")      
+
+            speak_worker.add_speak_task(get_filter_response(state["last_text"]))
+
             # Add the user's last text to the chatbot task queue
             chatbot_worker.add_chatbot_task(state["last_text"])
             
